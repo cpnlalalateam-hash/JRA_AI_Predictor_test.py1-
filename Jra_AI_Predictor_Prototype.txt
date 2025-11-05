@@ -1,0 +1,65 @@
+# ✅ JRA_AI_Predictor_test.py（テスト版・Renderで即動作）
+
+from fastapi import FastAPI
+from pydantic import BaseModel
+from typing import List, Optional
+import uvicorn
+
+app = FastAPI(title="JRA AI Predictor Test Version")
+
+# --- 入力データの形式 ---
+class HorseInput(BaseModel):
+    horse_id: str
+    horse_name: Optional[str]
+    age: Optional[int]
+    sex: Optional[str]
+    jockey: Optional[str]
+    trainer: Optional[str]
+    weight: Optional[float]
+    last_pos: Optional[int]
+    recent_form_score: Optional[float]
+    dist: Optional[int]
+    course: Optional[str]
+    ground: Optional[str]
+    odds: Optional[float]
+
+class RaceRequest(BaseModel):
+    race_id: str
+    horses: List[HorseInput]
+
+# --- 仮の予測関数（ダミーAI） ---
+@app.post("/predict")
+async def predict(rq: RaceRequest):
+    results = []
+    for h in rq.horses:
+        base_score = (100 - (h.last_pos or 10)) + (h.recent_form_score or 50) / 10 - (h.odds or 10)
+        prob_win = max(0.01, min(0.9, base_score / 100))
+        results.append({
+            "horse_id": h.horse_id,
+            "horse_name": h.horse_name,
+            "prob_win": round(prob_win, 3)
+        })
+
+    sorted_results = sorted(results, key=lambda x: x["prob_win"], reverse=True)
+    return {"race_id": rq.race_id, "predictions": sorted_results}
+
+# --- 動作確認用エンドポイント ---
+@app.get("/health")
+async def health():
+    return {"status": "ok", "message": "JRA AI Predictor Test API is running!"}
+
+# --- Renderで動かすための起動設定 ---
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=10000)
+
+# --- 実行手順（Render対応） ---
+# 1️⃣ 以下3つのファイルを同じフォルダに置く：
+#     - JRA_AI_Predictor_test.py（このファイル）
+#     - requirements.txt
+#     - Dockerfile
+# 2️⃣ Renderで「New Web Service」を選択
+# 3️⃣ Pythonを選び、起動コマンドに以下を指定：
+#     python JRA_AI_Predictor_test.py
+# 4️⃣ デプロイ完了後、表示されたURLにアクセス：
+#     https://あなたのURL.onrender.com/health
+#     → {"status": "ok"} が返れば成功！
